@@ -149,7 +149,8 @@ Bağlam:
 Soru: {user_query}
 Yanıt:"""
 
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                # Çok kararlı çalışan gemini-pro modeli
+                model = genai.GenerativeModel("gemini-pro")
                 response = model.generate_content(prompt)
                 ans = response.text
 
