@@ -3,7 +3,6 @@ import shutil
 import streamlit as st
 from langchain_community.document_loaders import Docx2txtLoader, PyMuPDFLoader
 from langchain_community.vectorstores import Chroma
-from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -49,7 +48,7 @@ else:
                     with open(file_path, "wb") as f:
                         f.write(uploaded_file.getbuffer())
 
-                # Tüm data klasörünü yeniden tara ve vektör veritabanını güncelle
+                # Tüm data klasörünü yeniden tara
                 docs = []
                 if os.path.exists(DATA_DIR):
                     for file in os.listdir(DATA_DIR):
@@ -67,10 +66,11 @@ else:
                     )
                     splits = text_splitter.split_documents(docs)
 
-                    embeddings = OpenAIEmbeddings()
+                    embeddings = OpenAIEmbeddings(model="text-embedding-ada-002")
                     if os.path.exists(DB_DIR):
                         shutil.rmtree(DB_DIR)
 
+                    # Chroma veritabanı oluşturma
                     vectorstore = Chroma.from_documents(
                         documents=splits,
                         embedding=embeddings,
@@ -104,7 +104,8 @@ else:
                         chunk_size=1000, chunk_overlap=200
                     )
                     splits = text_splitter.split_documents(docs)
-                    embeddings = OpenAIEmbeddings()
+                    embeddings = OpenAIEmbeddings(model="text-embedding-ada-002")
+                    
                     vectorstore = Chroma.from_documents(
                         documents=splits,
                         embedding=embeddings,
@@ -118,7 +119,7 @@ else:
 
     # Soru - Cevap Arayüzü
     if os.path.exists(DB_DIR):
-        embeddings = OpenAIEmbeddings()
+        embeddings = OpenAIEmbeddings(model="text-embedding-ada-002")
         vectorstore = Chroma(
             persist_directory=DB_DIR, embedding_function=embeddings
         )
@@ -134,11 +135,9 @@ else:
 
         if user_query:
             with st.spinner("Mevzuat taranıyor..."):
-                # İlgili belgeleri bul
                 source_documents = retriever.invoke(user_query)
                 context = "\n\n".join([doc.page_content for doc in source_documents])
 
-                # Prompt hazırla ve LLM'e gönder
                 prompt = f"""Sen profesyonel bir mevzuat ve hukuk asistanısın. Sadece aşağıdaki bağlamda (mevzuat metninde) yer alan bilgilere dayanarak soruyu yanıtla. Eğer bilgi metinde yoksa "Yüklenen mevzuat metinlerinde bu bilgiye ulaşılamadı" de.
 
 Bağlam:
