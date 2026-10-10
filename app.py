@@ -3,33 +3,56 @@ import shutil
 import streamlit as st
 from langchain_community.document_loaders import Docx2txtLoader, PyMuPDFLoader
 from langchain_community.vectorstores import Chroma
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_core.embeddings import Embeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from google import genai
 
 st.set_page_config(
-    page_title="GitHub Destekli Mevzuat Asistanı", page_icon="⚖️", layout="wide"
+    page_title="Gemini Destekli Mevzuat Asistanı", page_icon="⚖️", layout="wide"
 )
 
-st.title("⚖️ GitHub Kaynaklı Akıllı Mevzuat Asistanı")
+st.title("⚖️ Gemini Kaynaklı Akıllı Mevzuat Asistanı")
 st.write(
-    "Mevzuat belgeleriniz GitHub reponuzdaki `data` klasöründen beslenir. Yeni eklenen belgeleri sisteme dahil etmek için güncelleyebilirsiniz."
+    "Mevzuat belgeleriniz GitHub reponuzdaki `data` klasöründen beslenir. Google Gemini altyapısıyla çalışır."
 )
 
 # Sidebar - Ayarlar ve Dosya Ekleme
 st.sidebar.header("⚙️ Ayarlar & Veri Yönetimi")
-api_key = st.sidebar.text_input(
-    "OpenAI API Key", type="password", help="OpenAI API anahtarınızı girin."
+gemini_api_key = st.sidebar.text_input(
+    "Gemini API Key", type="password", help="Google AI Studio'dan aldığınız API anahtarınızı girin."
 )
 
 DATA_DIR = "data"
 DB_DIR = "./chroma_db"
 
-if not api_key:
+if not gemini_api_key:
     st.warning(
-        "Lütfen devam etmek için sol menüden OpenAI API anahtarınızı girin."
+        "Lütfen devam etmek için sol menüden Gemini API anahtarınızı girin."
+    )
+    st.info(
+        "💡 Ücretsiz Gemini API anahtarını [Google AI Studio](https://aistudio.google.com/) adresinden saniyeler içinde alabilirsiniz."
     )
 else:
-    os.environ["OPENAI_API_KEY"] = api_key
+    # Gemini İstemcisini Başlatma
+    client = genai.Client(api_key=gemini_api_key)
+
+    # Langchain için özel Gemini Embedding Sınıfı
+    class GeminiEmbeddings(Embeddings):
+        def embed_documents(self, texts: list[str]) -> list[list[float]]:
+            response = client.models.embed_content(
+                model="text-embedding-004",
+                contents=texts
+            )
+            return [e.values for e in response.embeddings]
+
+        def embed_query(self, text: str) -> list[float]:
+            response = client.models.embed_content(
+                model="text-embedding-004",
+                contents=text
+            )
+            return response.embeddings[0].values
+
+    embeddings = GeminiEmbeddings()
 
     # Zamanla yeni mevzuat eklemek için arayüzden yükleme alanı
     st.sidebar.subheader("➕ Yeni Mevzuat Ekle")
@@ -48,7 +71,6 @@ else:
                     with open(file_path, "wb") as f:
                         f.write(uploaded_file.getbuffer())
 
-                # Tüm data klasörünü yeniden tara
                 docs = []
                 if os.path.exists(DATA_DIR):
                     for file in os.listdir(DATA_DIR):
@@ -66,11 +88,9 @@ else:
                     )
                     splits = text_splitter.split_documents(docs)
 
-                    embeddings = OpenAIEmbeddings(model="text-embedding-ada-002")
                     if os.path.exists(DB_DIR):
                         shutil.rmtree(DB_DIR)
 
-                    # Chroma veritabanı oluşturma
                     vectorstore = Chroma.from_documents(
                         documents=splits,
                         embedding=embeddings,
@@ -104,7 +124,6 @@ else:
                         chunk_size=1000, chunk_overlap=200
                     )
                     splits = text_splitter.split_documents(docs)
-                    embeddings = OpenAIEmbeddings(model="text-embedding-ada-002")
                     
                     vectorstore = Chroma.from_documents(
                         documents=splits,
@@ -119,13 +138,10 @@ else:
 
     # Soru - Cevap Arayüzü
     if os.path.exists(DB_DIR):
-        embeddings = OpenAIEmbeddings(model="text-embedding-ada-002")
         vectorstore = Chroma(
             persist_directory=DB_DIR, embedding_function=embeddings
         )
         retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
-
-        llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
 
         st.markdown("---")
         user_query = st.text_input(
@@ -146,8 +162,12 @@ Bağlam:
 Soru: {user_query}
 Yanıt:"""
 
-                response = llm.invoke(prompt)
-                ans = response.content
+                # Gemini modeli ile yanıt üretme
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt,
+                )
+                ans = response.text
 
                 st.markdown("### 🤖 Yanıt:")
                 st.write(ans)
