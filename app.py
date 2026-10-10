@@ -149,8 +149,8 @@ Bağlam:
 Soru: {user_query}
 Yanıt:"""
 
-                # Çok kararlı çalışan gemini-pro modeli
-                model = genai.GenerativeModel("gemini-pro")
+                # Doğrudan en güncel ve kararlı model adı
+                model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
                 response = model.generate_content(prompt)
                 ans = response.text
 
