@@ -1,9 +1,9 @@
 import os
 import shutil
 import streamlit as st
-from langchain.chains import RetrievalQA
 from langchain_community.document_loaders import Docx2txtLoader, PyMuPDFLoader
 from langchain_community.vectorstores import Chroma
+from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -125,9 +125,6 @@ else:
         retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
         llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
-        qa_chain = RetrievalQA.from_chain_type(
-            llm=llm, chain_type="stuff", retriever=retriever, return_source_documents=True
-        )
 
         st.markdown("---")
         user_query = st.text_input(
@@ -137,15 +134,27 @@ else:
 
         if user_query:
             with st.spinner("Mevzuat taranıyor..."):
-                response = qa_chain.invoke({"query": user_query})
-                ans = response["result"]
-                sources = response["source_documents"]
+                # İlgili belgeleri bul
+                source_documents = retriever.invoke(user_query)
+                context = "\n\n".join([doc.page_content for doc in source_documents])
+
+                # Prompt hazırla ve LLM'e gönder
+                prompt = f"""Sen profesyonel bir mevzuat ve hukuk asistanısın. Sadece aşağıdaki bağlamda (mevzuat metninde) yer alan bilgilere dayanarak soruyu yanıtla. Eğer bilgi metinde yoksa "Yüklenen mevzuat metinlerinde bu bilgiye ulaşılamadı" de.
+
+Bağlam:
+{context}
+
+Soru: {user_query}
+Yanıt:"""
+
+                response = llm.invoke(prompt)
+                ans = response.content
 
                 st.markdown("### 🤖 Yanıt:")
                 st.write(ans)
 
                 with st.expander("📚 Kaynak Mevzuat Maddeleri"):
-                    for i, doc in enumerate(sources):
+                    for i, doc in enumerate(source_documents):
                         st.markdown(f"**Kaynak {i+1}:**")
                         st.text(doc.page_content[:300] + "...")
                         if "source" in doc.metadata:
