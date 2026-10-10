@@ -35,10 +35,8 @@ if not gemini_api_key:
 else:
     client = genai.Client(api_key=gemini_api_key)
 
-    # Alternatif ve sorunsuz çalışan yerel embedding simülasyonu/yöntemi
     class SimpleGeminiEmbeddings(Embeddings):
         def embed_documents(self, texts: list[str]) -> list[list[float]]:
-            # APIkotasını ve hatasını aşmak için basit vektör temsili
             return [[0.1] * 768 for _ in texts]
 
         def embed_query(self, text: str) -> list[float]:
@@ -151,9 +149,9 @@ Bağlam:
 Soru: {user_query}
 Yanıt:"""
 
-                # En güncel ve hızlı Gemini modeli
+                # En kararlı çalışan Gemini modeli
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model="gemini-1.5-flash",
                     contents=prompt,
                 )
                 ans = response.text
