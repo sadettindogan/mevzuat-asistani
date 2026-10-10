@@ -5,7 +5,7 @@ from langchain_community.document_loaders import Docx2txtLoader, PyMuPDFLoader
 from langchain_community.vectorstores import Chroma
 from langchain_core.embeddings import Embeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from google import genai
+import google.generativeai as genai
 
 st.set_page_config(
     page_title="Gemini Destekli Mevzuat Asistanı", page_icon="⚖️", layout="wide"
@@ -33,8 +33,7 @@ if not gemini_api_key:
         "💡 Ücretsiz Gemini API anahtarını [Google AI Studio](https://aistudio.google.com/) adresinden saniyeler içinde alabilirsiniz."
     )
 else:
-    # Yeni ve kararlı genai Client yapısı
-    client = genai.Client(api_key=gemini_api_key)
+    genai.configure(api_key=gemini_api_key)
 
     class SimpleGeminiEmbeddings(Embeddings):
         def embed_documents(self, texts: list[str]) -> list[list[float]]:
@@ -150,11 +149,9 @@ Bağlam:
 Soru: {user_query}
 Yanıt:"""
 
-                # Kesinlikle hatasız çalışan güncel çağrı yöntemi ve modeli
-                response = client.models.generate_content(
-                    model="gemini-2.0-flash",
-                    contents=prompt,
-                )
+                # Klasik ve en güvenilir gemini-1.5-flash çağrısı
+                model = genai.GenerativeModel("gemini-1.5-flash")
+                response = model.generate_content(prompt)
                 ans = response.text
 
                 st.markdown("### 🤖 Yanıt:")
